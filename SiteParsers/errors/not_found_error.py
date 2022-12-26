@@ -1,6 +1,6 @@
 from typing import Self
 
-from errors.base_parser_error import BaseParserError
+from SiteParsers.errors.base_parser_error import BaseParserError
 
 
 class NotFoundError(BaseParserError):
