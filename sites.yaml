@@ -1,0 +1,10 @@
+GateIO:
+  Version: 3
+  PriceXPath: //*[@id="quote-details"]/div[1]/div[2]/div[2]/span/span[2]
+  RelationSymbolXPath: //*[@id="quote-details"]/div[1]/div[2]/div[2]/span/span[1]
+  URLTemplate: ["https://www.gate.io/price/{Coin}-{Ticker}/{Relation}", [Coin, Ticker, Relation]]
+  NotFoundText: The page you are looking for is not found!
+  Capabilities:
+    CausesNotFound: false
+  Warnings:
+    - "⚠️ If the requested relation does not exist, it will be USD"

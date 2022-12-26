@@ -1,0 +1,12 @@
+[flake8]
+inline-quotes = double
+avoid-escape = True
+max-string-usages=4
+max-line-length=120
+ignore =
+    WPS305
+    D100
+exclude =
+    .git
+    __pycache__
+docstring-quotes = """
