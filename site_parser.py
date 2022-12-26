@@ -7,7 +7,7 @@ class Parser(object):
     """Use given information (Coin, Ticker, Relation, Source, Config and Driver) to get the price of the asset."""
 
     def __init__(self, template_args, src, config, driver):
-        """Raise a zero division error or type error.
+        """Use given information (Coin, Ticker, Relation, Source, Config and Driver) to get the price of the asset.
 
         Args:
             template_args: Dict with Coin, Ticker, Relation parameters
