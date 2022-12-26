@@ -1,9 +1,10 @@
 from typing import Self
 
 import requests
-from base_parser import BaseSiteParser
-from errors.not_found_error import NotFoundError
 from lxml import html  # noqa: S410
+
+from SiteParsers.base_parser import BaseSiteParser
+from SiteParsers.errors.not_found_error import NotFoundError
 
 
 class GateIO(BaseSiteParser):
