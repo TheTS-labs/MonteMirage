@@ -16,4 +16,4 @@ RUN pip install --upgrade pip && \
 
 COPY ./ ./
 
-ENTRYPOINT [ "poetry", "run", "python3", "Parser.py" ]
+ENTRYPOINT [ "poetry", "run", "python3", "main.py" ]
