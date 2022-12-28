@@ -1,6 +1,6 @@
 from datetime import datetime
 from statistics import mean, stdev
-from time import sleep
+import asyncio
 from typing import List
 
 from constants import DB, OVERVIEW_SRCS, PARSE_ONCE_AT_SECS, WATCHLIST
@@ -68,4 +68,4 @@ async def update_prices() -> None:
             for overview in data_dicts[1]:
                 HistoricalOverview.create(**overview).save()
 
-        sleep(PARSE_ONCE_AT_SECS)
+        await asyncio.sleep(PARSE_ONCE_AT_SECS)
