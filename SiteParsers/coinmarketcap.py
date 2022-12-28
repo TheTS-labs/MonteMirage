@@ -23,6 +23,9 @@ class CoinMarketCap(BaseSiteParser):
         if b"Sorry, we couldn't find your page" in page.content:
             raise NotFoundError(self.coin, self.ticker)
 
-        return soup.xpath(
-            '//*[@id="__next"]/div/div[1]/div[2]/div/div[1]/div[2]/div/div[2]/div[1]/div/span',
-        )[0].text.replace("$", "")
+        try:
+            return soup.xpath(
+                '//*[@id="__next"]/div/div[1]/div[2]/div/div[1]/div[2]/div/div[2]/div[1]/div/span',
+            )[0].text.replace("$", "")
+        except IndexError:
+            raise NotFoundError(self.coin, self.ticker)
