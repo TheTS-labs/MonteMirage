@@ -1,19 +1,28 @@
 import asyncio
 import logging
 import os
-import discord
 
+import discord
 from discord.ext import commands
-from SiteParsers.errors.not_found_error import NotFoundError
 
 from constants import BOT, DB, OVERVIEW_SRCS
 from models.historical_data import HistoricalOverview, HistoricalSrcPrice
 from SiteParsers.coinmarketcap import CoinMarketCap
+from SiteParsers.errors.not_found_error import NotFoundError
 from SiteParsers.gateio import GateIO
 from update_prices import update_prices
 
 
 def get_change(current: float | int, previous: float | int) -> float:
+    """Calculate percent change between two numbers.
+
+    Args:
+        current: Current number
+        previous: Previous number
+
+    Returns:
+        Float number with two numbers after comma
+    """
     if current == previous:
         return 100.0
     try:
@@ -109,7 +118,7 @@ async def overview(ctx: commands.context.Context, coin: str, ticker: str) -> Non
         coin: Full coin name(bitcoin, litecoin e.g.)
         ticker: Ticker of the coin(btc, ltc e.g.)
     """
-    reply = [f"Overview of {coin.capitalize()}({ticker.upper()}):"]
+    reply = [f"Overview of {coin.capitalize()}({ticker.upper()}):"]  # noqa: WPS221
 
     previous_record = HistoricalOverview.select().where(
         HistoricalOverview.coin == coin,
@@ -117,8 +126,14 @@ async def overview(ctx: commands.context.Context, coin: str, ticker: str) -> Non
     ).order_by(-HistoricalOverview.timestamp).first()
 
     if previous_record:
-        reply.append(f"\n*Standard deviation(std) of price between exchanges: ${round(previous_record.std_between_srcs, 2)}*")
-        reply.append(f"\n*Average price between exchanges: ${round(previous_record.mean_between_srcs, 2)}*\n")
+        reply.extend([
+            "\n*Standard deviation(std) of price between exchanges: ${std}*".format(
+                std=round(previous_record.std_between_srcs, 2),
+            ),
+            "\n*Average price between exchanges: ${mean}*\n".format(
+                mean=round(previous_record.mean_between_srcs, 2),
+            ),
+        ])
 
     for overview_src in OVERVIEW_SRCS:
         try:
