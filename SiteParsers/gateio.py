@@ -23,4 +23,7 @@ class GateIO(BaseSiteParser):
         if b"The page you are looking for is not found!" in page.content:
             raise NotFoundError(self.coin, self.ticker)
 
-        return soup.xpath('//*[@id="quote-details"]/div[1]/div[2]/div[2]/span/span[2]')[0].text
+        try:
+            return soup.xpath('//*[@id="quote-details"]/div[1]/div[2]/div[2]/span/span[2]')[0].text
+        except IndexError:
+            raise NotFoundError(self.coin, self.ticker)

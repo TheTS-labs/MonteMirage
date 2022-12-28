@@ -1,21 +1,28 @@
+import asyncio
+import logging
 import os
-
 import discord
-from discord.ext import commands
-from dotenv import load_dotenv
 
+from discord.ext import commands
+from SiteParsers.errors.not_found_error import NotFoundError
+
+from constants import BOT, DB, OVERVIEW_SRCS
+from models.historical_data import HistoricalOverview, HistoricalSrcPrice
 from SiteParsers.coinmarketcap import CoinMarketCap
 from SiteParsers.gateio import GateIO
-
-load_dotenv()
-
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
-overview_srcs = [GateIO, CoinMarketCap]
+from update_prices import update_prices
 
 
-@bot.command(name="GateIO", help="Get the price of the asset in dollars, by GateIO")
+def get_change(current: float | int, previous: float | int) -> float:
+    if current == previous:
+        return 100.0
+    try:
+        return round((abs(current - previous) / previous) * 100.0, 2)
+    except ZeroDivisionError:
+        return 0
+
+
+@BOT.command(name="GateIO", help="Get the price of the asset in dollars, by GateIO")
 async def gateio(ctx: commands.context.Context, coin: str, ticker: str) -> None:
     """Get the price of the asset in dollars, by GateIO.
 
@@ -24,30 +31,76 @@ async def gateio(ctx: commands.context.Context, coin: str, ticker: str) -> None:
         coin: Full coin name(bitcoin, litecoin e.g.)
         ticker: Ticker of the coin(btc, ltc e.g.)
     """
-    await ctx.reply("Current price of {coin}({ticker}) is: ${price}".format(
-        coin=coin.capitalize(),
-        ticker=ticker.upper(),
-        price=GateIO(coin, ticker).get(),
-    ))
+    previous_price = HistoricalSrcPrice.select().where(
+        HistoricalSrcPrice.src == "GateIO",
+        HistoricalSrcPrice.coin == coin,
+        HistoricalSrcPrice.ticker == ticker,
+    ).first()
+
+    try:
+        current_price = float(GateIO(coin, ticker).get().replace(",", ""))
+    except NotFoundError as err:
+        await ctx.reply(err.message)
+        return
+
+    if previous_price:
+        change = get_change(current_price, previous_price.price)
+
+        await ctx.reply("Current price of {coin}({ticker}) is: ${price}({change_symbol}{change}%)".format(
+            coin=coin.capitalize(),
+            ticker=ticker.upper(),
+            price=current_price,
+            change_symbol="+" if current_price >= previous_price.price else "-",
+            change=change,
+        ))
+    else:
+        await ctx.reply("Current price of {coin}({ticker}) is: ${price}".format(
+            coin=coin.capitalize(),
+            ticker=ticker.upper(),
+            price=current_price,
+        ))
 
 
-@bot.command(name="CoinMarketCap", help="Get the price of the asset in dollars, by CoinMarketCap")
+@BOT.command(name="CoinMarketCap", help="Get the price of the asset in dollars, by CoinMarketCap")
 async def coinmarketcap(ctx: commands.context.Context, coin: str, ticker: str) -> None:
-    """Get the price of the asset in dollars.
+    """Get the price of the asset in dollars, by CoinMarketCap.
 
     Args:
         ctx: Context object
         coin: Full coin name(bitcoin, litecoin e.g.)
         ticker: Ticker of the coin(btc, ltc e.g.)
     """
-    await ctx.reply("Current price of {coin}({ticker}) is: ${price}".format(
-        coin=coin.capitalize(),
-        ticker=ticker.upper(),
-        price=CoinMarketCap(coin, ticker).get(),
-    ))
+    previous_price = HistoricalSrcPrice.select().where(
+        HistoricalSrcPrice.src == "CoinMarketCap",
+        HistoricalSrcPrice.coin == coin,
+        HistoricalSrcPrice.ticker == ticker,
+    ).first()
+
+    try:
+        current_price = float(CoinMarketCap(coin, ticker).get().replace(",", ""))
+    except NotFoundError as err:
+        await ctx.reply(err.message)
+        return
+
+    if previous_price:
+        change = get_change(current_price, previous_price.price)
+
+        await ctx.reply("Current price of {coin}({ticker}) is: ${price}({change_symbol}{change}%)".format(
+            coin=coin.capitalize(),
+            ticker=ticker.upper(),
+            price=current_price,
+            change_symbol="+" if current_price >= previous_price.price else "-",
+            change=change,
+        ))
+    else:
+        await ctx.reply("Current price of {coin}({ticker}) is: ${price}".format(
+            coin=coin.capitalize(),
+            ticker=ticker.upper(),
+            price=current_price,
+        ))
 
 
-@bot.command(name="overview", help="Get the price of the asset in dollars, by all src`s")
+@BOT.command(name="overview", help="Get the price of the asset in dollars, by all src`s")
 async def overview(ctx: commands.context.Context, coin: str, ticker: str) -> None:
     """Get the price of the asset in dollars, by all src`s.
 
@@ -56,14 +109,43 @@ async def overview(ctx: commands.context.Context, coin: str, ticker: str) -> Non
         coin: Full coin name(bitcoin, litecoin e.g.)
         ticker: Ticker of the coin(btc, ltc e.g.)
     """
-    reply = [f"Overview of {coin}({ticker}):"]
+    reply = [f"Overview of {coin.capitalize()}({ticker.upper()}):"]
 
-    for overview_src in overview_srcs:
-        reply.append("\n- By {name}, price is: ${price}".format(
-            name=overview_src.__name__,
-            price=overview_src(coin, ticker).get(),
-        ))
+    previous_record = HistoricalOverview.select().where(
+        HistoricalOverview.coin == coin,
+        HistoricalOverview.ticker == ticker,
+    ).order_by(-HistoricalOverview.timestamp).first()
+
+    if previous_record:
+        reply.append(f"\n*Standard deviation(std) of price between exchanges: ${round(previous_record.std_between_srcs, 2)}*")
+        reply.append(f"\n*Average price between exchanges: ${round(previous_record.mean_between_srcs, 2)}*\n")
+
+    for overview_src in OVERVIEW_SRCS:
+        try:
+            reply.append("\n- By {name}, price is: ${price}".format(
+                name=overview_src.__name__,
+                price=overview_src(coin, ticker).get(),
+            ))
+        except NotFoundError as err:
+            await ctx.reply(err.message)
+            return
 
     await ctx.reply("".join(reply))
 
-bot.run(os.getenv("DISCORD_API_KEY"))
+
+async def main() -> None:  # noqa: D103
+    DB.connect()
+    DB.create_tables([HistoricalSrcPrice, HistoricalOverview])
+    discord.utils.setup_logging(level=logging.INFO, root=False)
+
+    await asyncio.gather(
+        BOT.start(os.getenv("DISCORD_API_KEY")),
+        update_prices(),
+    )
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Quiting...")  # noqa: WPS421
+    finally:
+        DB.close()
